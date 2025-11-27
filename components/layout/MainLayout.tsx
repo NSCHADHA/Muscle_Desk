@@ -15,16 +15,6 @@ import { useGymData } from "@/hooks/useGymData"
 
 type NavItem = "dashboard" | "members" | "plans" | "payments" | "reminders" | "branches" | "staff" | "settings"
 
-type Member = {
-  id: string
-  name: string
-  email: string
-  phone?: string
-  status?: string
-  plan_duration?: number
-  expiry_date?: string
-}
-
 interface MainLayoutProps {
   onLogout: () => void
 }
@@ -35,61 +25,99 @@ export function MainLayout({ onLogout }: MainLayoutProps) {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
   const [globalSearchQuery, setGlobalSearchQuery] = useState("")
 
-  // Event listeners for modal triggers
   useEffect(() => {
     const handleOpenAddMember = () => {
       setCurrentPage("members")
-      setTimeout(() => window.dispatchEvent(new CustomEvent("triggerAddMember")), 100)
+      // Dispatch event to Members component after a small delay
+      setTimeout(() => {
+        window.dispatchEvent(new CustomEvent("triggerAddMember"))
+      }, 100)
     }
 
     const handleOpenAddPayment = () => {
       setCurrentPage("payments")
-      setTimeout(() => window.dispatchEvent(new CustomEvent("triggerAddPayment")), 100)
+      setTimeout(() => {
+        window.dispatchEvent(new CustomEvent("triggerAddPayment"))
+      }, 100)
+    }
+
+    const handleNavigateToReminders = () => {
+      setCurrentPage("reminders")
+    }
+
+    const handleNavigateToPlans = () => {
+      setCurrentPage("plans")
     }
 
     window.addEventListener("openAddMember", handleOpenAddMember)
     window.addEventListener("openAddPayment", handleOpenAddPayment)
+    window.addEventListener("navigateToReminders", handleNavigateToReminders)
+    window.addEventListener("navigateToPlans", handleNavigateToPlans)
 
     return () => {
       window.removeEventListener("openAddMember", handleOpenAddMember)
       window.removeEventListener("openAddPayment", handleOpenAddPayment)
+      window.removeEventListener("navigateToReminders", handleNavigateToReminders)
+      window.removeEventListener("navigateToPlans", handleNavigateToPlans)
     }
   }, [])
 
-  // Logout
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (!document.hidden && state.authUser) {
+        // Page became visible - SWR will automatically revalidate
+        console.log("[v0] Tab became active - multi-device sync ready")
+      }
+    }
+
+    const handleOnline = () => {
+      // Device came back online
+      console.log("[v0] Device came online - multi-device sync ready")
+    }
+
+    document.addEventListener("visibilitychange", handleVisibilityChange)
+    window.addEventListener("online", handleOnline)
+
+    return () => {
+      document.removeEventListener("visibilitychange", handleVisibilityChange)
+      window.removeEventListener("online", handleOnline)
+    }
+  }, [state.authUser])
+
   const handleLogout = async () => {
     await logout()
     onLogout()
   }
 
-  // Global Search with proper types
   const handleSearch = (query: string) => {
     setGlobalSearchQuery(query)
 
-    if (!query.trim()) return
-    const lowerQuery = query.toLowerCase()
+    if (query.trim()) {
+      const lowerQuery = query.toLowerCase()
 
-    // FIXED typing for TypeScript
-    const memberMatch = state.members.some((m: Member) => {
-      return (
-        m.name.toLowerCase().includes(lowerQuery) ||
-        m.email.toLowerCase().includes(lowerQuery) ||
-        (m.phone?.includes(query) ?? false)
+      const memberMatch = state.members.some(
+        (m) =>
+          m.name.toLowerCase().includes(lowerQuery) ||
+          m.email.toLowerCase().includes(lowerQuery) ||
+          m.phone.includes(query),
       )
-    })
 
-    const paymentMatch =
-      state.payments.some((p: any) => p.member_name?.toLowerCase().includes(lowerQuery)) ||
-      lowerQuery.includes("payment") ||
-      lowerQuery.includes("₹")
+      const paymentMatch =
+        state.payments.some((p) => p.member_name?.toLowerCase().includes(lowerQuery)) ||
+        lowerQuery.includes("payment") ||
+        lowerQuery.includes("₹")
 
-    const planMatch =
-      state.plans.some((p: any) => p.name.toLowerCase().includes(lowerQuery)) ||
-      lowerQuery.includes("plan")
+      const planMatch =
+        state.plans.some((p) => p.name.toLowerCase().includes(lowerQuery)) || lowerQuery.includes("plan")
 
-    if (memberMatch && currentPage !== "members") setCurrentPage("members")
-    else if (paymentMatch && currentPage !== "payments") setCurrentPage("payments")
-    else if (planMatch && currentPage !== "plans") setCurrentPage("plans")
+      if (memberMatch && currentPage !== "members") {
+        setCurrentPage("members")
+      } else if (paymentMatch && currentPage !== "payments") {
+        setCurrentPage("payments")
+      } else if (planMatch && currentPage !== "plans") {
+        setCurrentPage("plans")
+      }
+    }
   }
 
   const renderPage = () => {
@@ -123,10 +151,12 @@ export function MainLayout({ onLogout }: MainLayoutProps) {
 
   return (
     <div className="flex h-screen bg-background">
+      {/* Mobile Menu Overlay */}
       {isMobileMenuOpen && (
         <div className="fixed inset-0 bg-black/50 z-40 md:hidden" onClick={() => setIsMobileMenuOpen(false)} />
       )}
 
+      {/* Sidebar */}
       <div
         className={`fixed inset-y-0 left-0 z-50 md:relative md:translate-x-0 transition-transform duration-300 ${
           isMobileMenuOpen ? "translate-x-0" : "-translate-x-full"
@@ -141,6 +171,7 @@ export function MainLayout({ onLogout }: MainLayoutProps) {
         />
       </div>
 
+      {/* Main Content */}
       <div className="flex-1 flex flex-col overflow-hidden">
         <AppHeader
           onMenuClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
@@ -148,7 +179,6 @@ export function MainLayout({ onLogout }: MainLayoutProps) {
           userName={state.user?.ownerName || "User"}
           userRole={state.user?.gymName || "My Gym"}
           notificationCount={state.reminders.length}
-          onSearch={handleSearch}
         />
         <main className="flex-1 overflow-auto bg-gradient-to-br from-background to-background/50">{renderPage()}</main>
       </div>

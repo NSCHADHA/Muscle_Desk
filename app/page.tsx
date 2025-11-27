@@ -4,7 +4,6 @@ import { useState, useEffect } from "react"
 import { AuthPages } from "@/components/auth/AuthPages"
 import { MainLayout } from "@/components/layout/MainLayout"
 import { createClient } from "@/lib/supabase/client"
-import type { AuthChangeEvent, Session } from "@supabase/supabase-js"
 
 export default function Home() {
   const [isAuthenticated, setIsAuthenticated] = useState(false)
@@ -14,11 +13,9 @@ export default function Home() {
   useEffect(() => {
     setMounted(true)
 
-    const supabase = createClient()
-
-    // Initial auth check
     const checkAuth = async () => {
       try {
+        const supabase = createClient()
         const {
           data: { user },
         } = await supabase.auth.getUser()
@@ -34,19 +31,15 @@ export default function Home() {
 
     checkAuth()
 
-    // Real-time auth listener
+    const supabase = createClient()
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange(
-      (_event: AuthChangeEvent, session: Session | null) => {
-        setIsAuthenticated(!!session)
-        setLoading(false)
-      }
-    )
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      setIsAuthenticated(!!session)
+      setLoading(false)
+    })
 
-    return () => {
-      subscription.unsubscribe()
-    }
+    return () => subscription.unsubscribe()
   }, [])
 
   if (!mounted || loading) {
